@@ -4,9 +4,11 @@ use fancy_regex::{Captures, Regex};
 use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+#[derive(Debug)]
 pub enum Variable {
     X(usize),
     Y,
@@ -24,11 +26,23 @@ impl Variable {
     }
 }
 
+impl Display for Variable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Variable::X(n) => write!(f, "x{}", n),
+            Variable::Z(n) => write!(f, "z{}", n),
+            Variable::Y => write!(f, "y"),
+        }
+    }
+}
+
 pub enum Instruction {
     Increment { var: Variable },
     Decrement { var: Variable },
     JumpNonZero { var: Variable, to: String },
     Nop,
+    Print { var: Variable },
+    State,
 }
 
 impl Instruction {
@@ -58,6 +72,17 @@ impl Instruction {
         let nop_regex: Regex = Regex::new(r"^nop$").unwrap();
         if let Some(_) = nop_regex.captures(instruction)? {
             return Ok(Some(Instruction::Nop));
+        }
+
+        let print_regex: Regex = Regex::new(r"^print (y|[xz]\d)$").unwrap();
+        if let Some(caps) = print_regex.captures(instruction)? {
+            let instruction = Instruction::Print { var: Variable::parse(&caps[1], line_num)? };
+            return Ok(Some(instruction));
+        }
+
+        let state_regex: Regex = Regex::new(r"^state$").unwrap();
+        if let Some(_) = state_regex.captures(instruction)? {
+            return Ok(Some(Instruction::State));
         }
 
         Ok(None)

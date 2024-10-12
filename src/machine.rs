@@ -65,6 +65,23 @@ impl<'a> Machine<'a> {
                     jumped = true;
                 },
                 Instruction::Nop => {}
+                Instruction::Print { var } =>
+                    println!("[{}] {} = {}", self.state.pc, var, self.state.get_var(var)),
+                Instruction::State => {
+                    println!("PC = {}", self.state.pc);
+                    println!("y = {}", self.state.get_var(&Variable::Y));
+                    let rows = usize::max(self.state.x.len(), self.state.z.len());
+                    println!("      |{:12}|{:12}", "x", "z");
+                    println!("------|------------|------------");
+                    for i in 1..=rows {
+                        println!(
+                            "{:6}|{:12}|{:12}",
+                            i,
+                            self.state.get_var(&Variable::X(i)),
+                            self.state.get_var(&Variable::Z(i)),
+                        );
+                    }
+                }
             };
 
             if !jumped { self.state.pc += 1; }
