@@ -89,6 +89,19 @@ impl Instruction {
     }
 }
 
+impl Display for Instruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instruction::Increment { var } => write!(f, "{} <- {0} + 1", var),
+            Instruction::Decrement { var } => write!(f, "{} <- {0} - 1", var),
+            Instruction::JumpNonZero { var, to } => write!(f, "if {} != 0 goto {}", var, to),
+            Instruction::Nop => write!(f, "nop"),
+            Instruction::Print { var } => write!(f, "print {}", var),
+            Instruction::State => write!(f, "state"),
+        }
+    }
+}
+
 pub struct Macro {
     pub pattern: Regex,
     pub replacements: HashMap<String, usize>,
@@ -97,12 +110,15 @@ pub struct Macro {
 
 impl Macro {
     pub fn parse(def: &str) -> Self {
+        let escape_regex: Regex = Regex::new(r"[+*.$^()|?\\\[\]]").unwrap();
+        let def = escape_regex.replace_all(&def, |caps: &Captures| format!(r"\{}", &caps[0]));
+
         let macro_def_regex: Regex = Regex::new(r"\{(\w+)}").unwrap();
-        let pattern = macro_def_regex.replace_all(def, r"(\w+)");
+        let pattern = macro_def_regex.replace_all(&def, r"(\w+)");
         let pattern = Regex::new(&format!("^{}$", pattern)).unwrap();
 
         let mut replacements = HashMap::new();
-        for (n, caps) in macro_def_regex.captures_iter(def).flatten().enumerate() {
+        for (n, caps) in macro_def_regex.captures_iter(&def).flatten().enumerate() {
             replacements.insert(caps[1].to_string(), n);
         }
 
@@ -257,7 +273,7 @@ impl Program {
         let uid: u64 = rng.gen();
         for instruction in &m.instructions {
             // Expand % token
-            let instruction = instruction.replace("%", &format!("MACRO_{:x}_", uid));
+            let instruction = instruction.replace("%", &format!("MACRO_{:X}_", uid));
 
             // Find labels
             let instruction = Self::find_label(

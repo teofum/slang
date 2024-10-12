@@ -24,4 +24,15 @@ pub const PROLOGUE: &'static str = r"
         goto %C
 [%E]    nop
 @end
+
+@def {v} <- {a} + {b}
+        v <- a
+        $t <- b
+[%C]    if $t != 0 goto %B
+        goto %E
+[%B]    $t <- $t - 1
+        v <- v + 1
+        goto %C
+[%E]    nop
+@end
 ";

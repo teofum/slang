@@ -6,7 +6,9 @@ procrastination. No relation to the shader language.
 
 ## Language specification
 
-A _program_ in S Language ("slang") is a finite series of instructions.
+A _program_ in S Language ("slang") is a finite series of instructions. The
+language is a simple state machine, where the state encompasses the value of all
+variables and the program counter.
 
 ### Variables
 
@@ -33,12 +35,11 @@ single uppercase letter is used.
 The language has only three instructions, with one alternative syntax provided
 for convenience:
 
-| Instruction        | Function                                                                                                             |
-|--------------------|----------------------------------------------------------------------------------------------------------------------|
-| `v <- v + 1`       | Increment the value of a variable by one.                                                                            |
-| `v <- v - 1`       | Decrement the value of a variable by one. If it is zero, the value remains unchanged.                                |
-| `if v != 0 goto L` | Conditional jump. Move the program counter to the instruction marked with label `L` if the value of `v` is not zero. |
-| `jnz v`            | Alternative syntax for conditional jump.                                                                             |
+| Instruction        | Alternate syntax | Function                                                                                                             |
+|--------------------|------------------|----------------------------------------------------------------------------------------------------------------------|
+| `v <- v + 1`       |                  | Increment the value of a variable by one.                                                                            |
+| `v <- v - 1`       |                  | Decrement the value of a variable by one. If it is zero, the value remains unchanged.                                |
+| `if v != 0 goto L` | `jnz v`          | Conditional jump. Move the program counter to the instruction marked with label `L` if the value of `v` is not zero. |
 
 Where `v` is a variable name and `L` is a label. A jump to an undefined label
 terminates execution immediately. Labels **must** be unique; a label
@@ -50,6 +51,15 @@ Any instruction may be preceded by a label in brackets:
 [A] x1 <- x1 - 1
     if x1 != 0 goto A
 ```
+
+Some additional "meta" instructions are provided for utility, that do not alter
+the execution state:
+
+| Instruction | Function                                                |
+|-------------|---------------------------------------------------------|
+| `nop`       | Does nothing. Useful for jumping out of macros.         |
+| `print v`   | Prints the value of a variable to stdout for debugging. |
+| `state`     | Prints the entire state of execution to stdout.         |
 
 Leading and trailing whitespace is ignored. It is recommended to align
 instructions for readability.
@@ -156,8 +166,9 @@ The three macros used as examples above are defined in the _prologue_ loaded
 before any program, and are available to use. A list of all macros defined in
 the prologue follows:
 
-| Pattern        | Function                                              |
-|----------------|-------------------------------------------------------|
-| `goto {label}` | Unconditional jump.                                   |
-| `{v} <- 0`     | Assign zero to a variable.                            |
-| `{v1} <- {v2}` | Assign the value of `v2` to `v1`. `v2` is left as is. |
+| Pattern            | Function                                              |
+|--------------------|-------------------------------------------------------|
+| `goto {label}`     | Unconditional jump.                                   |
+| `{v} <- 0`         | Assign zero to a variable.                            |
+| `{v1} <- {v2}`     | Assign the value of `v2` to `v1`. `v2` is left as is. |
+| `{v} <- {a} + {b}` | Assign the sum of `a` and `b` to `v`.                 |
