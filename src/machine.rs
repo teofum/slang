@@ -9,7 +9,7 @@ pub struct State {
 
 impl State {
     pub fn from_vars(vars: Vec<usize>) -> Self {
-        State { x: vars, z: Vec::from([0; 10]), y: 0, pc: 0 }
+        State { x: vars, z: Vec::new(), y: 0, pc: 0 }
     }
 
     pub fn get_var(&self, var: &Variable) -> usize {
