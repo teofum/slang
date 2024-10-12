@@ -36,6 +36,17 @@ pub const PROLOGUE: &'static str = r"
 [%E]    nop
 @end
 
+@def {v} <- {a} - {b}
+        v <- a
+        $t <- b
+[%C]    if $t != 0 goto %B
+        goto %E
+[%B]    $t <- $t - 1
+        v <- v - 1
+        if v != 0 goto %C
+[%E]    nop
+@end
+
 @def {v} <- {a} * {b}
         v <- 0
         $t <- b
@@ -45,6 +56,18 @@ pub const PROLOGUE: &'static str = r"
         $u <- a + v
         v <- $u
         goto %B
+[%E]    nop
+@end
+
+@def {v} <- {a} / {b}
+        v <- 0
+        $t <- a
+[%C]    $u <- b - $t
+        if $u != 0 goto %E
+        $w <- $t - b
+        $t <- $w
+        v <- v + 1
+        goto %C
 [%E]    nop
 @end
 ";
