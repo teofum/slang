@@ -7,6 +7,7 @@ use std::fs::File;
 mod program;
 mod machine;
 mod error;
+mod prologue;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);

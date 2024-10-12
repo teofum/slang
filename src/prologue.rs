@@ -1,3 +1,4 @@
+pub const PROLOGUE: &'static str = r"
 @def goto {label}
     $a <- $a + 1
     if $a != 0 goto label
@@ -23,5 +24,4 @@
         goto %C
 [%E]    nop
 @end
-
-y <- x1
+";

@@ -1,4 +1,5 @@
 use crate::error::ParseError;
+use crate::prologue::PROLOGUE;
 use fancy_regex::{Captures, Regex};
 use rand::Rng;
 use std::collections::HashMap;
@@ -101,8 +102,13 @@ impl Program {
         };
         let mut current_macro: Option<Box<Macro>> = None;
 
+        // Read source file and append its lines to prologue
         let reader = BufReader::new(file);
-        let lines: Vec<_> = reader.lines().flatten().enumerate().collect();
+        let lines: Vec<_> = PROLOGUE.lines()
+            .map(|str| str.to_string())
+            .chain(reader.lines().flatten())
+            .enumerate()
+            .collect();
 
         // Variable counting pre-pass
         let var_regex: Regex = Regex::new(r"\bz(\d+)\b").unwrap();
