@@ -53,14 +53,14 @@ impl Instruction {
             return Ok(Some(instruction));
         }
 
-        let dec_regex: Regex = Regex::new(r"^(y|[xz]\d) <- (\1) - 1$").unwrap();
+        let dec_regex: Regex = Regex::new(r"^(y|[xz]\d+) <- (\1) - 1$").unwrap();
         if let Some(caps) = dec_regex.captures(instruction)? {
             let instruction = Instruction::Decrement { var: Variable::parse(&caps[1], line_num)? };
             return Ok(Some(instruction));
         }
 
-        let jnz_regex: Regex = Regex::new(r"^if (y|[xz]\d) != 0 goto (\w+)$").unwrap();
-        let jnz_alt_regex: Regex = Regex::new(r"^jnz (y|[xz]\d) (\w+)$").unwrap();
+        let jnz_regex: Regex = Regex::new(r"^if (y|[xz]\d+) != 0 goto (\w+)$").unwrap();
+        let jnz_alt_regex: Regex = Regex::new(r"^jnz (y|[xz]\d+) (\w+)$").unwrap();
         if let Some(caps) = jnz_regex.captures(instruction)?.or(jnz_alt_regex.captures(instruction)?) {
             let instruction = Instruction::JumpNonZero {
                 var: Variable::parse(&caps[1], line_num)?,
@@ -74,7 +74,7 @@ impl Instruction {
             return Ok(Some(Instruction::Nop));
         }
 
-        let print_regex: Regex = Regex::new(r"^print (y|[xz]\d)$").unwrap();
+        let print_regex: Regex = Regex::new(r"^print (y|[xz]\d+)$").unwrap();
         if let Some(caps) = print_regex.captures(instruction)? {
             let instruction = Instruction::Print { var: Variable::parse(&caps[1], line_num)? };
             return Ok(Some(instruction));
