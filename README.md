@@ -172,3 +172,4 @@ the prologue follows:
 | `{v} <- 0`         | Assign zero to a variable.                            |
 | `{v1} <- {v2}`     | Assign the value of `v2` to `v1`. `v2` is left as is. |
 | `{v} <- {a} + {b}` | Assign the sum of `a` and `b` to `v`.                 |
+| `{v} <- {a} * {b}` | Assign the product of `a` and `b` to `v`.             |
