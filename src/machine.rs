@@ -64,6 +64,7 @@ impl<'a> Machine<'a> {
                         .unwrap_or(&self.program.instructions.len());
                     jumped = true;
                 },
+                Instruction::Nop => {}
             };
 
             if !jumped { self.state.pc += 1; }

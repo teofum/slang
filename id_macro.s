@@ -1,6 +1,6 @@
 @def goto {label}
-$a <- $a + 1
-if $a != 0 goto label
+    $a <- $a + 1
+    if $a != 0 goto label
 @end
 
 [A] if x1 != 0 goto B

@@ -1,5 +1,6 @@
 use crate::error::ParseError;
 use fancy_regex::{Captures, Regex};
+use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -26,6 +27,7 @@ pub enum Instruction {
     Increment { var: Variable },
     Decrement { var: Variable },
     JumpNonZero { var: Variable, to: String },
+    Nop,
 }
 
 impl Instruction {
@@ -50,6 +52,11 @@ impl Instruction {
                 to: caps[2].to_owned(),
             };
             return Ok(Some(instruction));
+        }
+
+        let nop_regex: Regex = Regex::new(r"^nop$").unwrap();
+        if let Some(_) = nop_regex.captures(instruction)? {
+            return Ok(Some(Instruction::Nop));
         }
 
         Ok(None)
@@ -144,24 +151,13 @@ impl Program {
     }
 
     fn parse_line(&mut self, instruction: &str, line_num: usize) -> Result<(), Box<dyn Error>> {
-        let instruction_number = self.instructions.len();
-        let mut instruction = instruction;
-
         // Find a label and add it to the program's list of labels
-        let label_regex: Regex = Regex::new(r"^\[(\w+)]").unwrap();
-        if let Some(caps) = label_regex.captures(instruction)? {
-            let full = &caps[0];
-            let label_name = &caps[1];
-
-            if self.labels.contains_key(label_name) {
-                return Err(ParseError::boxed(&format!("Redefined label {}", label_name), line_num));
-            }
-
-            self.labels.insert(label_name.to_owned(), instruction_number);
-            instruction = instruction.strip_prefix(full).unwrap();
-        }
-
-        let instruction = instruction.trim();
+        let instruction = Self::find_label(
+            instruction,
+            self.instructions.len(),
+            &mut self.labels,
+            line_num,
+        )?.trim();
 
         // Match an instruction
         if let Some(instruction) = Instruction::parse(instruction, line_num)? {
@@ -170,9 +166,17 @@ impl Program {
         }
 
         // Match macros
-        for i in 0..self.macros.len() {
-            if let Some(caps) = self.macros[i].pattern.captures(instruction)? {
-                self.expand_macro(i, &caps, line_num)?;
+        for m in &self.macros {
+            if let Some(caps) = m.pattern.captures(instruction)? {
+                Self::expand_macro(
+                    &self.macros,
+                    m,
+                    &mut self.instructions,
+                    &mut self.labels,
+                    &mut self.max_temp_var,
+                    &caps,
+                    line_num,
+                )?;
                 return Ok(());
             }
         }
@@ -183,31 +187,89 @@ impl Program {
         )
     }
 
-    fn expand_macro(&mut self, macro_idx: usize, caps: &Captures, line_num: usize) -> Result<(), Box<dyn Error>> {
+    fn find_label<'a>(
+        instruction: &'a str,
+        instruction_number: usize,
+        labels: &mut HashMap<String, usize>,
+        line_num: usize,
+    ) -> Result<&'a str, Box<dyn Error>> {
+        let label_regex: Regex = Regex::new(r"^\[(\w+)]").unwrap();
+        match label_regex.captures(instruction)? {
+            Some(caps) => {
+                let full = &caps[0];
+                let label_name = &caps[1];
+
+                if labels.contains_key(label_name) {
+                    return Err(ParseError::boxed(&format!("Redefined label {}", label_name), line_num));
+                }
+
+                labels.insert(label_name.to_owned(), instruction_number);
+                Ok(instruction.strip_prefix(full).unwrap())
+            }
+            None => Ok(instruction)
+        }
+    }
+
+    fn expand_macro(
+        macros: &Vec<Macro>,
+        m: &Macro,
+        instructions: &mut Vec<Instruction>,
+        labels: &mut HashMap<String, usize>,
+        max_temp_var: &mut usize,
+        caps: &Captures,
+        line_num: usize,
+    ) -> Result<(), Box<dyn Error>> {
         let auto_var_regex: Regex = Regex::new(r"\$(\w+)").unwrap();
         let mut auto_vars = HashMap::new();
 
-        let m = &self.macros[macro_idx];
+        let mut rng = rand::thread_rng();
+        let uid: u64 = rng.gen();
         for instruction in &m.instructions {
+            // Expand % token
+            let instruction = instruction.replace("%", &format!("MACRO_{:x}_", uid));
+
+            // Find labels
+            let instruction = Self::find_label(
+                &instruction,
+                instructions.len(),
+                labels,
+                line_num,
+            )?.trim();
+
             // Perform macro replacements
-            let mut replaced = instruction.to_string();
+            let mut instruction = instruction.to_string();
             for (pattern, cap) in &m.replacements {
-                replaced = replaced.replace(pattern, &caps[*cap + 1]);
+                instruction = instruction.replace(pattern, &caps[*cap + 1]);
             }
 
             // Replace automatic variables
-            let replaced = auto_var_regex.replace_all(&replaced, |caps: &Captures| {
+            let instruction = auto_var_regex.replace_all(&instruction, |caps: &Captures| {
                 let var_name = caps[1].to_string();
                 let var_num = auto_vars.entry(var_name).or_insert_with(|| {
-                    self.max_temp_var += 1;
-                    self.max_temp_var
+                    *max_temp_var += 1;
+                    *max_temp_var
                 });
 
                 format!("z{}", var_num)
             });
 
-            if let Some(instruction) = Instruction::parse(&replaced, line_num)? {
-                self.instructions.push(instruction);
+            if let Some(instruction) = Instruction::parse(&instruction, line_num)? {
+                instructions.push(instruction);
+            } else {
+                for m in macros {
+                    if let Some(caps) = m.pattern.captures(&instruction)? {
+                        Self::expand_macro(
+                            macros,
+                            m,
+                            instructions,
+                            labels,
+                            max_temp_var,
+                            &caps,
+                            line_num,
+                        )?;
+                        break;
+                    }
+                }
             }
         }
 
