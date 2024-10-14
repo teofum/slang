@@ -4,6 +4,17 @@ pub const PROLOGUE: &'static str = r"
     if $a != 0 goto label
 @end
 
+@def if {v} = 0 goto {label}
+        if v != 0 goto %E
+        goto label
+[%E]    nop
+@end
+
+@def if {v1} < {v2} goto {label}
+        $a <- v2 - v1
+        if $a != 0 goto label
+@end
+
 @def {v} <- 0
 [%L]    v <- v - 1
         if v != 0 goto %L
@@ -82,6 +93,14 @@ pub const PROLOGUE: &'static str = r"
 
 @def jnz {v} {label}
         if v != 0 goto label
+@end
+
+@def jze {v} {label}
+        if v = 0 goto label
+@end
+
+@def jlt {v1} {v2} {label}
+        if v1 < v2 goto label
 @end
 
 @def mov {v1} {v2}
