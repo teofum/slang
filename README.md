@@ -35,11 +35,11 @@ single uppercase letter is used.
 The language has only three instructions, with one alternative syntax provided
 for convenience:
 
-| Instruction        | Alternate syntax | Function                                                                                                             |
-|--------------------|------------------|----------------------------------------------------------------------------------------------------------------------|
-| `v <- v + 1`       |                  | Increment the value of a variable by one.                                                                            |
-| `v <- v - 1`       |                  | Decrement the value of a variable by one. If it is zero, the value remains unchanged.                                |
-| `if v != 0 goto L` | `jnz v`          | Conditional jump. Move the program counter to the instruction marked with label `L` if the value of `v` is not zero. |
+| Instruction        | Function                                                                                                             |
+|--------------------|----------------------------------------------------------------------------------------------------------------------|
+| `v <- v + 1`       | Increment the value of a variable by one.                                                                            |
+| `v <- v - 1`       | Decrement the value of a variable by one. If it is zero, the value remains unchanged.                                |
+| `if v != 0 goto L` | Conditional jump. Move the program counter to the instruction marked with label `L` if the value of `v` is not zero. |
 
 Where `v` is a variable name and `L` is a label. A jump to an undefined label
 terminates execution immediately. Labels **must** be unique; a label

@@ -70,4 +70,21 @@ pub const PROLOGUE: &'static str = r"
         goto %C
 [%E]    nop
 @end
+
+# Alt syntax macros
+@def inc {v}
+        v <- v + 1
+@end
+
+@def dec {v}
+        v <- v - 1
+@end
+
+@def jnz {v} {label}
+        if v != 0 goto label
+@end
+
+@def mov {v1} {v2}
+        v1 <- v2
+@end
 ";

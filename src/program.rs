@@ -60,8 +60,7 @@ impl Instruction {
         }
 
         let jnz_regex: Regex = Regex::new(r"^if (y|[xz]\d+) != 0 goto (\w+)$").unwrap();
-        let jnz_alt_regex: Regex = Regex::new(r"^jnz (y|[xz]\d+) (\w+)$").unwrap();
-        if let Some(caps) = jnz_regex.captures(instruction)?.or(jnz_alt_regex.captures(instruction)?) {
+        if let Some(caps) = jnz_regex.captures(instruction)? {
             let instruction = Instruction::JumpNonZero {
                 var: Variable::parse(&caps[1], line_num)?,
                 to: caps[2].to_owned(),
