@@ -166,12 +166,14 @@ The three macros used as examples above are defined in the _prologue_ loaded
 before any program, and are available to use. A list of all macros defined in
 the prologue follows:
 
-| Pattern            | Function                                               |
-|--------------------|--------------------------------------------------------|
-| `goto {label}`     | Unconditional jump.                                    |
-| `{v} <- 0`         | Assign zero to a variable.                             |
-| `{v1} <- {v2}`     | Assign the value of `v2` to `v1`. `v2` is left as is.  |
-| `{v} <- {a} + {b}` | Assign the sum of variables `a` and `b` to `v`.        |
-| `{v} <- {a} - {b}` | Assign the difference of variables `a` and `b` to `v`. |
-| `{v} <- {a} * {b}` | Assign the product of variables `a` and `b` to `v`.    |
-| `{v} <- {a} / {b}` | Assign the quotient of variables `a` and `b` to `v`.   |
+| Pattern                       | Function                                               |
+|-------------------------------|--------------------------------------------------------|
+| `goto {label}`                | Unconditional jump.                                    |
+| `if {v} = 0 goto {label}`     | Jump if `v` is zero.                                   |
+| `if {v1} < {v2} goto {label}` | Compare two variables and jump if `v1 < v2`.           |
+| `{v} <- 0`                    | Assign zero to a variable.                             |
+| `{v1} <- {v2}`                | Assign the value of `v2` to `v1`. `v2` is left as is.  |
+| `{v} <- {a} + {b}`            | Assign the sum of variables `a` and `b` to `v`.        |
+| `{v} <- {a} - {b}`            | Assign the difference of variables `a` and `b` to `v`. |
+| `{v} <- {a} * {b}`            | Assign the product of variables `a` and `b` to `v`.    |
+| `{v} <- {a} / {b}`            | Assign the quotient of variables `a` and `b` to `v`.   |
