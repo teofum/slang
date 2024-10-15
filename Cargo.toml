@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 fancy-regex = "0.13.0"
 rand = "0.8.5"
+regex = "1.11.0"
