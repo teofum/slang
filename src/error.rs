@@ -22,7 +22,7 @@ impl ParseError {
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ParseError [on {}]: {}", self.line_number, self.message)
+        write!(f, "ParseError [line {}]: {}", self.line_number, self.message)
     }
 }
 
