@@ -14,10 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let program_file = File::open(args.next().unwrap())?;
     match Program::from_file(&program_file) {
         Ok(program) => {
-            // println!("Program number: {}", program);
-            for instruction in &program.instructions {
-                println!("{}", instruction);
-            }
+            println!("Program number: {}", program);
             
             let mut machine = Machine::new(
                 State::from_vars(args.map(|arg| arg.parse::<usize>().unwrap()).collect()),
