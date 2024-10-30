@@ -4,6 +4,22 @@ Simple barebones programming language used in a logic and computability course
 in uni. Decided to implement an interpreter as a weekend project for fun and
 procrastination. No relation to the shader language.
 
+## CLI usage
+
+To run a program simply pass the file containing the program code as an
+argument:
+
+```
+slang program.s
+```
+
+To instead print the Gödel number associated with a program (as a series of
+prime exponents), use the `-p` option:
+
+```
+slang -p program.s
+```
+
 ## Language specification
 
 A _program_ in S Language ("slang") is a finite series of instructions. The
@@ -26,9 +42,8 @@ initialized to `0`.
 
 ### Labels
 
-Labels are used for jump instructions, and may be any string including
-alphanumeric characters (upper and lowercase) and underscores. Conventionally, a
-single uppercase letter is used.
+Labels are used for jump instructions, and take the form `Ax, Bx, Cx, Dx, Ex`
+where `x` is a positive integer greater than or equal to one.
 
 ### Instructions
 
@@ -48,8 +63,8 @@ redefinition will result in a parser error.
 Any instruction may be preceded by a label in brackets:
 
 ```
-[A] x1 <- x1 - 1
-    if x1 != 0 goto A
+[A1]    x1 <- x1 - 1
+        if x1 != 0 goto A1
 ```
 
 Some additional "meta" instructions are provided for utility, that do not alter
@@ -70,8 +85,8 @@ Any line starting with `#` is interpreted as a comment and ignored:
 
 ```
 # Loop until x1 is zero
-[A] x1 <- x1 - 1
-    if x1 != 0 goto A
+[A1]    x1 <- x1 - 1
+        if x1 != 0 goto A1
 ```
 
 ## Macros
@@ -105,23 +120,24 @@ will be replaced by the first unused auxiliary variable `zi`, ensuring its value
 is not accidentally overwritten elsewhere, and that using the macro doesn't
 unintentionally overwrite unrelated variables.
 
-### Scoped labels
+### Automatic labels
 
 Similarly, if a macro containing a label is used more than once in a program, a
 way to differentiate each one is needed to prevent conflicting labels.
 
-For this purpose, _scoped labels_ can be used within macro definitions by
+For this purpose, _automatic labels_ can be used within macro definitions by
 prefixing a label name with `%` in both its definition and use:
 
 ```
 # Assign zero to a variable
 @def {v} <- 0
-[%L]    v <- v - 1
-        if v != 0 goto %L
+[%A1]   v <- v - 1
+        if v != 0 goto %A1
 @end
 ```
 
-Scoped labels will be prefixed with a unique identifier upon expansion.
+Automatic labels will be replaced with available labels on expansion, analogous
+to automatic variables.
 
 ### Nested macros
 
@@ -131,18 +147,18 @@ Macros can be used within other macros to compose more complex programs:
 # Assign the value of v2 to v1, preserving the former
 @def {v1} <- {v2}
         v1 <- 0
-[%A]    if v2 != 0 goto %B
-        goto %C
-[%B]    v2 <- v2 - 1
+[%A1]   if v2 != 0 goto %B1
+        goto %C1
+[%B1]   v2 <- v2 - 1
         v1 <- v1 + 1
         $a <- $a + 1
-        goto %A
-[%C]    if $a != 0 goto %D
-        goto %E
-[%D]    $a <- $a - 1
+        goto %A1
+[%C1]   if $a != 0 goto %D1
+        goto %E1
+[%D1]   $a <- $a - 1
         v2 <- v2 + 1
-        goto %C
-[%E]    nop
+        goto %C1
+[%E1]   nop
 @end
 ```
 
