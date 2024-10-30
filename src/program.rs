@@ -27,6 +27,14 @@ impl Variable {
             _ => Err(ParseError::boxed("Invalid variable name", line_num))
         }
     }
+
+    pub fn get_number(&self) -> usize {
+        match self {
+            Variable::Y => 0,
+            Variable::X(num) => num * 2 - 1,
+            Variable::Z(num) => num * 2,
+        }
+    }
 }
 
 impl Display for Variable {
@@ -48,7 +56,7 @@ pub struct Label(usize);
 
 impl Label {
     pub fn new(group: usize, number: usize) -> Self {
-        Label(number * 5 + group)
+        Label((number - 1) * 5 + group)
     }
 
     pub fn parse(label: &str, line_num: usize) -> Result<Self, Box<dyn Error>> {
@@ -56,11 +64,19 @@ impl Label {
         match c {
             Some(c @ 'A'..='E') => {
                 let number = label[1..].parse::<usize>()?;
-                let group = c as usize - 'A' as usize;
-                Ok(Label(number * 5 + group))
+                if number == 0 {
+                    Err(ParseError::boxed("Label numbering starts at 1", line_num))
+                } else {
+                    let group = c as usize - 'A' as usize;
+                    Ok(Label::new(group, number))
+                }
             }
             _ => Err(ParseError::boxed("Invalid label name", line_num))
         }
+    }
+
+    pub fn get_number(&self) -> usize {
+        self.0 + 1
     }
 }
 
@@ -68,7 +84,7 @@ impl Display for Label {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let number = self.0 / 5;
         let group = char::from_u32('A' as u32 + (self.0 % 5) as u32).unwrap();
-        write!(f, "{}{}", group, number)
+        write!(f, "{}{}", group, number + 1)
     }
 }
 
@@ -125,6 +141,16 @@ impl Instruction {
         }
 
         Ok(None)
+    }
+
+    pub fn get_number(&self) -> (usize, usize) {
+        match self {
+            Instruction::Nop => (0, 0),
+            Instruction::Increment { var } => (1, var.get_number()),
+            Instruction::Decrement { var } => (2, var.get_number()),
+            Instruction::JumpNonZero { var, to } => (2 + to.get_number(), var.get_number()),
+            _ => panic!("Attempted to get number for meta-instruction"),
+        }
     }
 }
 
@@ -295,6 +321,33 @@ impl Program {
             line_num)
         )
     }
+
+    fn get_number(&self) -> Vec<usize> {
+        let mut reverse_labels = HashMap::new();
+        for (label, inst) in &self.labels {
+            reverse_labels.insert(*inst, *label);
+        }
+
+        let mut inst_idx = 0;
+        self.instructions.iter().filter_map(|instruction| {
+            let temp = match instruction {
+                Instruction::Print { var: _ } | Instruction::State => None, // Skip meta-instructions
+                instruction => {
+                    let (b, c) = instruction.get_number();
+                    let a = reverse_labels.get(&inst_idx).map_or(0, |label| label.get_number());
+                    Some(pair(a, pair(b, c)))
+                }
+            };
+            inst_idx += 1;
+            temp
+        }).collect()
+    }
+}
+
+impl Display for Program {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}]", self.get_number().iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "))
+    }
 }
 
 fn find_label<'a>(
@@ -339,7 +392,8 @@ fn expand_macro(
         // Replace automatic labels
         let instruction = auto_label_regex.replace_all(instruction, |caps: &Captures| {
             let (group, number) = parse_label_capture(caps);
-            let label = auto_labels.entry(Label::new(group, number)).or_insert_with(|| {
+            let local = Label::new(group, number);
+            let label = auto_labels.entry(local).or_insert_with(|| {
                 max_labels[group] += 1;
                 Label::new(group, max_labels[group])
             });
@@ -401,4 +455,8 @@ fn parse_label_capture(caps: &Captures) -> (usize, usize) {
         caps[1].chars().next().unwrap() as usize - 'A' as usize,
         caps[2].parse::<usize>().unwrap()
     )
+}
+
+fn pair(x: usize, y: usize) -> usize {
+    2usize.pow(x as u32) * (2 * y + 1) - 1
 }
