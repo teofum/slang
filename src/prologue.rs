@@ -5,9 +5,9 @@ pub const PROLOGUE: &'static str = r"
 @end
 
 @def if {v} = 0 goto {label}
-        if v != 0 goto %E
+        if v != 0 goto %E1
         goto label
-[%E]    nop
+[%E1]   nop
 @end
 
 @def if {v1} < {v2} goto {label}
@@ -16,70 +16,70 @@ pub const PROLOGUE: &'static str = r"
 @end
 
 @def {v} <- 0
-[%L]    v <- v - 1
-        if v != 0 goto %L
+[%A1]   v <- v - 1
+        if v != 0 goto %A1
 @end
 
 @def {v1} <- {v2}
         v1 <- 0
-[%A]    if v2 != 0 goto %B
-        goto %C
-[%B]    v2 <- v2 - 1
+[%A1]   if v2 != 0 goto %B1
+        goto %C1
+[%B1]   v2 <- v2 - 1
         v1 <- v1 + 1
         $a <- $a + 1
-        goto %A
-[%C]    if $a != 0 goto %D
-        goto %E
-[%D]    $a <- $a - 1
+        goto %A1
+[%C1]   if $a != 0 goto %D1
+        goto %E1
+[%D1]   $a <- $a - 1
         v2 <- v2 + 1
-        goto %C
-[%E]    nop
+        goto %C1
+[%E1]   nop
 @end
 
 @def {v} <- {a} + {b}
         v <- a
         $t <- b
-[%C]    if $t != 0 goto %B
-        goto %E
-[%B]    $t <- $t - 1
+[%C1]   if $t != 0 goto %B1
+        goto %E1
+[%B1]   $t <- $t - 1
         v <- v + 1
-        goto %C
-[%E]    nop
+        goto %C1
+[%E1]   nop
 @end
 
 @def {v} <- {a} - {b}
         v <- a
         $t <- b
-[%C]    if $t != 0 goto %B
-        goto %E
-[%B]    $t <- $t - 1
+[%C1]   if $t != 0 goto %B1
+        goto %E1
+[%B1]   $t <- $t - 1
         v <- v - 1
-        if v != 0 goto %C
-[%E]    nop
+        if v != 0 goto %C1
+[%E1]   nop
 @end
 
 @def {v} <- {a} * {b}
         v <- 0
         $t <- b
-[%B]    if $t != 0 goto %A
-        goto %E
-[%A]    $t <- $t - 1
+[%B1]   if $t != 0 goto %A1
+        goto %E1
+[%A1]   $t <- $t - 1
         $u <- a + v
         v <- $u
-        goto %B
-[%E]    nop
+        goto %B1
+[%E1]   nop
 @end
 
 @def {v} <- {a} / {b}
         v <- 0
         $t <- a
-[%C]    $u <- b - $t
-        if $u != 0 goto %E
+[%C1]   $u <- b - $t
+        if $u != 0 goto %E1
         $w <- $t - b
         $t <- $w
         v <- v + 1
-        goto %C
-[%E]    nop
+        goto %C1
+[%E1]   nop
 @end
 
 # Alt syntax macros

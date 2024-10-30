@@ -1,12 +1,15 @@
 use crate::error::ParseError;
 use crate::prologue::PROLOGUE;
 use fancy_regex::{Captures, Regex};
-use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+
+// =================================================================================================
+// Variables
+// =================================================================================================
 
 #[derive(Debug)]
 pub enum Variable {
@@ -36,10 +39,47 @@ impl Display for Variable {
     }
 }
 
+// =================================================================================================
+// Labels
+// =================================================================================================
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Label(usize);
+
+impl Label {
+    pub fn new(group: usize, number: usize) -> Self {
+        Label(number * 5 + group)
+    }
+
+    pub fn parse(label: &str, line_num: usize) -> Result<Self, Box<dyn Error>> {
+        let c = label.chars().next();
+        match c {
+            Some(c @ 'A'..='E') => {
+                let number = label[1..].parse::<usize>()?;
+                let group = c as usize - 'A' as usize;
+                Ok(Label(number * 5 + group))
+            }
+            _ => Err(ParseError::boxed("Invalid label name", line_num))
+        }
+    }
+}
+
+impl Display for Label {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let number = self.0 / 5;
+        let group = char::from_u32('A' as u32 + (self.0 % 5) as u32).unwrap();
+        write!(f, "{}{}", group, number)
+    }
+}
+
+// =================================================================================================
+// Instructions
+// =================================================================================================
+
 pub enum Instruction {
     Increment { var: Variable },
     Decrement { var: Variable },
-    JumpNonZero { var: Variable, to: String },
+    JumpNonZero { var: Variable, to: Label },
     Nop,
     Print { var: Variable },
     State,
@@ -63,7 +103,7 @@ impl Instruction {
         if let Some(caps) = jnz_regex.captures(instruction)? {
             let instruction = Instruction::JumpNonZero {
                 var: Variable::parse(&caps[1], line_num)?,
-                to: caps[2].to_owned(),
+                to: Label::parse(&caps[2], line_num)?,
             };
             return Ok(Some(instruction));
         }
@@ -101,6 +141,10 @@ impl Display for Instruction {
     }
 }
 
+// =================================================================================================
+// Macros
+// =================================================================================================
+
 pub struct Macro {
     pub pattern: Regex,
     pub replacements: HashMap<String, usize>,
@@ -125,11 +169,16 @@ impl Macro {
     }
 }
 
+// =================================================================================================
+// Parser
+// =================================================================================================
+
 pub struct Program {
     pub instructions: Vec<Instruction>,
-    pub labels: HashMap<String, usize>,
+    pub labels: HashMap<Label, usize>,
     pub macros: Vec<Macro>,
     max_temp_var: usize,
+    max_labels: [usize; 5],
 }
 
 impl Program {
@@ -139,6 +188,7 @@ impl Program {
             labels: HashMap::new(),
             macros: Vec::new(),
             max_temp_var: 0,
+            max_labels: [0; 5],
         };
         let mut current_macro: Option<Box<Macro>> = None;
 
@@ -150,17 +200,29 @@ impl Program {
             .enumerate()
             .collect();
 
-        // Variable counting pre-pass
+        // Variable and label counting pre-pass
         let var_regex: Regex = Regex::new(r"\bz(\d+)\b").unwrap();
+        let label_regex: Regex = Regex::new(r"([A-E])(\d+)").unwrap();
         for (_, line) in &lines {
-            program.max_temp_var = var_regex.captures_iter(&line).flatten()
+            program.max_temp_var = var_regex.captures_iter(line).flatten()
                 .map(|caps| caps[1].parse::<usize>().unwrap())
                 .fold(program.max_temp_var, usize::max);
+
+            program.max_labels = label_regex.captures_iter(line).flatten()
+                .map(|caps| parse_label_capture(&caps))
+                .fold(program.max_labels, |labels, (group, number)| {
+                    if number > labels[group] {
+                        let mut new_labels = labels;
+                        new_labels[group] = number;
+                        new_labels
+                    } else {
+                        labels
+                    }
+                })
         }
 
-        // reader.seek(SeekFrom::Start(0))?;
         for (line_num, line) in lines {
-            if line.len() == 0 || line.starts_with('#') {
+            if line.is_empty() || line.starts_with('#') {
                 continue; // Skip empty lines and comments
             }
 
@@ -220,6 +282,7 @@ impl Program {
                     &mut self.instructions,
                     &mut self.labels,
                     &mut self.max_temp_var,
+                    &mut self.max_labels,
                     &caps,
                     line_num,
                 )?;
@@ -236,20 +299,20 @@ impl Program {
     fn find_label<'a>(
         instruction: &'a str,
         instruction_number: usize,
-        labels: &mut HashMap<String, usize>,
+        labels: &mut HashMap<Label, usize>,
         line_num: usize,
     ) -> Result<&'a str, Box<dyn Error>> {
         let label_regex: Regex = Regex::new(r"^\[(\w+)]").unwrap();
         match label_regex.captures(instruction)? {
             Some(caps) => {
                 let full = &caps[0];
-                let label_name = &caps[1];
+                let label = Label::parse(&caps[1], line_num)?;
 
-                if labels.contains_key(label_name) {
-                    return Err(ParseError::boxed(&format!("Redefined label {}", label_name), line_num));
+                if labels.contains_key(&label) {
+                    return Err(ParseError::boxed(&format!("Redefined label {}", label), line_num));
                 }
 
-                labels.insert(label_name.to_owned(), instruction_number);
+                labels.insert(label, instruction_number);
                 Ok(instruction.strip_prefix(full).unwrap())
             }
             None => Ok(instruction)
@@ -260,19 +323,28 @@ impl Program {
         macros: &Vec<Macro>,
         m: &Macro,
         instructions: &mut Vec<Instruction>,
-        labels: &mut HashMap<String, usize>,
+        labels: &mut HashMap<Label, usize>,
         max_temp_var: &mut usize,
+        max_labels: &mut [usize; 5],
         caps: &Captures,
         line_num: usize,
     ) -> Result<(), Box<dyn Error>> {
         let auto_var_regex: Regex = Regex::new(r"\$(\w+)").unwrap();
+        let auto_label_regex: Regex = Regex::new(r"%([A-E])(\d+)").unwrap();
         let mut auto_vars = HashMap::new();
+        let mut auto_labels = HashMap::new();
 
-        let mut rng = rand::thread_rng();
-        let uid: u64 = rng.gen();
         for instruction in &m.instructions {
-            // Expand % token
-            let instruction = instruction.replace("%", &format!("MACRO_{:X}_", uid));
+            // Replace automatic labels
+            let instruction = auto_label_regex.replace_all(&instruction, |caps: &Captures| {
+                let (group, number) = parse_label_capture(caps);
+                let label = auto_labels.entry(Label::new(group, number)).or_insert_with(|| {
+                    max_labels[group] += 1;
+                    Label::new(group, max_labels[group])
+                });
+
+                format!("{}", label)
+            });
 
             // Find labels
             let instruction = Self::find_label(
@@ -310,6 +382,7 @@ impl Program {
                             instructions,
                             labels,
                             max_temp_var,
+                            max_labels,
                             &caps,
                             line_num,
                         )?;
@@ -321,4 +394,11 @@ impl Program {
 
         Ok(())
     }
+}
+
+fn parse_label_capture(caps: &Captures) -> (usize, usize) {
+    (
+        caps[1].chars().next().unwrap() as usize - 'A' as usize,
+        caps[2].parse::<usize>().unwrap()
+    )
 }
