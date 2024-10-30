@@ -260,7 +260,7 @@ impl Program {
 
     fn parse_line(&mut self, instruction: &str, line_num: usize) -> Result<(), Box<dyn Error>> {
         // Find a label and add it to the program's list of labels
-        let instruction = Self::find_label(
+        let instruction = find_label(
             instruction,
             self.instructions.len(),
             &mut self.labels,
@@ -276,7 +276,7 @@ impl Program {
         // Match macros
         for m in &self.macros {
             if let Some(caps) = m.pattern.captures(instruction)? {
-                Self::expand_macro(
+                expand_macro(
                     &self.macros,
                     m,
                     &mut self.instructions,
@@ -295,105 +295,105 @@ impl Program {
             line_num)
         )
     }
+}
 
-    fn find_label<'a>(
-        instruction: &'a str,
-        instruction_number: usize,
-        labels: &mut HashMap<Label, usize>,
-        line_num: usize,
-    ) -> Result<&'a str, Box<dyn Error>> {
-        let label_regex: Regex = Regex::new(r"^\[(\w+)]").unwrap();
-        match label_regex.captures(instruction)? {
-            Some(caps) => {
-                let full = &caps[0];
-                let label = Label::parse(&caps[1], line_num)?;
+fn find_label<'a>(
+    instruction: &'a str,
+    instruction_number: usize,
+    labels: &mut HashMap<Label, usize>,
+    line_num: usize,
+) -> Result<&'a str, Box<dyn Error>> {
+    let label_regex: Regex = Regex::new(r"^\[(\w+)]").unwrap();
+    match label_regex.captures(instruction)? {
+        Some(caps) => {
+            let full = &caps[0];
+            let label = Label::parse(&caps[1], line_num)?;
 
-                if labels.contains_key(&label) {
-                    return Err(ParseError::boxed(&format!("Redefined label {}", label), line_num));
-                }
-
-                labels.insert(label, instruction_number);
-                Ok(instruction.strip_prefix(full).unwrap())
+            if labels.contains_key(&label) {
+                return Err(ParseError::boxed(&format!("Redefined label {}", label), line_num));
             }
-            None => Ok(instruction)
+
+            labels.insert(label, instruction_number);
+            Ok(instruction.strip_prefix(full).unwrap())
+        }
+        None => Ok(instruction)
+    }
+}
+
+fn expand_macro(
+    macros: &Vec<Macro>,
+    m: &Macro,
+    instructions: &mut Vec<Instruction>,
+    labels: &mut HashMap<Label, usize>,
+    max_temp_var: &mut usize,
+    max_labels: &mut [usize; 5],
+    caps: &Captures,
+    line_num: usize,
+) -> Result<(), Box<dyn Error>> {
+    let auto_var_regex: Regex = Regex::new(r"\$(\w+)").unwrap();
+    let auto_label_regex: Regex = Regex::new(r"%([A-E])(\d+)").unwrap();
+    let mut auto_vars = HashMap::new();
+    let mut auto_labels = HashMap::new();
+
+    for instruction in &m.instructions {
+        // Replace automatic labels
+        let instruction = auto_label_regex.replace_all(instruction, |caps: &Captures| {
+            let (group, number) = parse_label_capture(caps);
+            let label = auto_labels.entry(Label::new(group, number)).or_insert_with(|| {
+                max_labels[group] += 1;
+                Label::new(group, max_labels[group])
+            });
+
+            format!("{}", label)
+        });
+
+        // Find labels
+        let instruction = find_label(
+            &instruction,
+            instructions.len(),
+            labels,
+            line_num,
+        )?.trim();
+
+        // Perform macro replacements
+        let mut instruction = instruction.to_string();
+        for (pattern, cap) in &m.replacements {
+            instruction = instruction.replace(pattern, &caps[*cap + 1]);
+        }
+
+        // Replace automatic variables
+        let instruction = auto_var_regex.replace_all(&instruction, |caps: &Captures| {
+            let var_name = caps[1].to_string();
+            let var_num = auto_vars.entry(var_name).or_insert_with(|| {
+                *max_temp_var += 1;
+                *max_temp_var
+            });
+
+            format!("z{}", var_num)
+        });
+
+        if let Some(instruction) = Instruction::parse(&instruction, line_num)? {
+            instructions.push(instruction);
+        } else {
+            for m in macros {
+                if let Some(caps) = m.pattern.captures(&instruction)? {
+                    expand_macro(
+                        macros,
+                        m,
+                        instructions,
+                        labels,
+                        max_temp_var,
+                        max_labels,
+                        &caps,
+                        line_num,
+                    )?;
+                    break;
+                }
+            }
         }
     }
 
-    fn expand_macro(
-        macros: &Vec<Macro>,
-        m: &Macro,
-        instructions: &mut Vec<Instruction>,
-        labels: &mut HashMap<Label, usize>,
-        max_temp_var: &mut usize,
-        max_labels: &mut [usize; 5],
-        caps: &Captures,
-        line_num: usize,
-    ) -> Result<(), Box<dyn Error>> {
-        let auto_var_regex: Regex = Regex::new(r"\$(\w+)").unwrap();
-        let auto_label_regex: Regex = Regex::new(r"%([A-E])(\d+)").unwrap();
-        let mut auto_vars = HashMap::new();
-        let mut auto_labels = HashMap::new();
-
-        for instruction in &m.instructions {
-            // Replace automatic labels
-            let instruction = auto_label_regex.replace_all(instruction, |caps: &Captures| {
-                let (group, number) = parse_label_capture(caps);
-                let label = auto_labels.entry(Label::new(group, number)).or_insert_with(|| {
-                    max_labels[group] += 1;
-                    Label::new(group, max_labels[group])
-                });
-
-                format!("{}", label)
-            });
-
-            // Find labels
-            let instruction = Self::find_label(
-                &instruction,
-                instructions.len(),
-                labels,
-                line_num,
-            )?.trim();
-
-            // Perform macro replacements
-            let mut instruction = instruction.to_string();
-            for (pattern, cap) in &m.replacements {
-                instruction = instruction.replace(pattern, &caps[*cap + 1]);
-            }
-
-            // Replace automatic variables
-            let instruction = auto_var_regex.replace_all(&instruction, |caps: &Captures| {
-                let var_name = caps[1].to_string();
-                let var_num = auto_vars.entry(var_name).or_insert_with(|| {
-                    *max_temp_var += 1;
-                    *max_temp_var
-                });
-
-                format!("z{}", var_num)
-            });
-
-            if let Some(instruction) = Instruction::parse(&instruction, line_num)? {
-                instructions.push(instruction);
-            } else {
-                for m in macros {
-                    if let Some(caps) = m.pattern.captures(&instruction)? {
-                        Self::expand_macro(
-                            macros,
-                            m,
-                            instructions,
-                            labels,
-                            max_temp_var,
-                            max_labels,
-                            &caps,
-                            line_num,
-                        )?;
-                        break;
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
+    Ok(())
 }
 
 fn parse_label_capture(caps: &Captures) -> (usize, usize) {
