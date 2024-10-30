@@ -109,7 +109,7 @@ impl Instruction {
         }
 
         let nop_regex: Regex = Regex::new(r"^nop$").unwrap();
-        if let Some(_) = nop_regex.captures(instruction)? {
+        if nop_regex.captures(instruction)?.is_some() {
             return Ok(Some(Instruction::Nop));
         }
 
@@ -120,7 +120,7 @@ impl Instruction {
         }
 
         let state_regex: Regex = Regex::new(r"^state$").unwrap();
-        if let Some(_) = state_regex.captures(instruction)? {
+        if state_regex.captures(instruction)?.is_some() {
             return Ok(Some(Instruction::State));
         }
 
@@ -154,7 +154,7 @@ pub struct Macro {
 impl Macro {
     pub fn parse(def: &str) -> Self {
         let escape_regex: Regex = Regex::new(r"[+*.$^()|?\\\[\]]").unwrap();
-        let def = escape_regex.replace_all(&def, |caps: &Captures| format!(r"\{}", &caps[0]));
+        let def = escape_regex.replace_all(def, |caps: &Captures| format!(r"\{}", &caps[0]));
 
         let macro_def_regex: Regex = Regex::new(r"\{(\w+)}").unwrap();
         let pattern = macro_def_regex.replace_all(&def, r"(\w+)");
@@ -196,7 +196,7 @@ impl Program {
         let reader = BufReader::new(file);
         let lines: Vec<_> = PROLOGUE.lines()
             .map(|str| str.to_string())
-            .chain(reader.lines().flatten())
+            .chain(reader.lines().map_while(Result::ok))
             .enumerate()
             .collect();
 
@@ -228,11 +228,11 @@ impl Program {
 
             if line.starts_with('@') {
                 // Process directives:
-                if line.starts_with("@def") {
-                    if let Some(_) = current_macro {
+                if let Some(line) = line.strip_prefix("@def") {
+                    if current_macro.is_some() {
                         return Err(ParseError::boxed("Unexpected nested @def directive", line_num));
                     } else {
-                        current_macro = Some(Box::new(Macro::parse(&line[4..].trim())));
+                        current_macro = Some(Box::new(Macro::parse(line.trim())));
                     }
                 } else if line.starts_with("@end") {
                     match current_macro {
@@ -336,7 +336,7 @@ impl Program {
 
         for instruction in &m.instructions {
             // Replace automatic labels
-            let instruction = auto_label_regex.replace_all(&instruction, |caps: &Captures| {
+            let instruction = auto_label_regex.replace_all(instruction, |caps: &Captures| {
                 let (group, number) = parse_label_capture(caps);
                 let label = auto_labels.entry(Label::new(group, number)).or_insert_with(|| {
                     max_labels[group] += 1;

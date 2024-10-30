@@ -1,4 +1,4 @@
-pub const PROLOGUE: &'static str = r"
+pub const PROLOGUE: &str = r"
 @def goto {label}
     $a <- $a + 1
     if $a != 0 goto label
